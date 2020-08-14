@@ -142,7 +142,6 @@ public class Board extends AbstractBoard<Elements> {
         return get(BOOM);
     }
 
-    //todo: переделать под взрывы под конкретный таймер бомб
     public Collection<Point> getFutureBlasts() {
         Collection<Point> bombs = getBombs();
         Collection<Point> result = new LinkedList<>();
@@ -159,32 +158,24 @@ public class Board extends AbstractBoard<Elements> {
                 if (!getWalls().contains(blast) & !getDestroyableWalls().contains(blast) & !getMeatChoppers().contains(blast) & result.contains(prevBlast)){
                     result.add(blast);
                 }
-                blast = null;
-                prevBlast = null;
                 blast = new PointImpl(bomb.getX() + i, bomb.getY());
                 prevBlast = new PointImpl(bomb.getX() + i - 1, bomb.getY());
                 if (!getWalls().contains(blast) & !getDestroyableWalls().contains(blast) & !getMeatChoppers().contains(blast) & result.contains(prevBlast)){
                     result.add(blast);
                 }
-                blast = null;
-                prevBlast = null;
                 blast = new PointImpl(bomb.getX(), bomb.getY() - i);
                 prevBlast = new PointImpl(bomb.getX(), bomb.getY() - i + 1);
                 if (!getWalls().contains(blast) & !getDestroyableWalls().contains(blast) & !getMeatChoppers().contains(blast) & result.contains(prevBlast)){
                     result.add(blast);
                 }
-                blast = null;
-                prevBlast = null;
                 blast = new PointImpl(bomb.getX(), bomb.getY() + i);
                 prevBlast = new PointImpl(bomb.getX(), bomb.getY() + i - 1);
                 if (!getWalls().contains(blast) & !getDestroyableWalls().contains(blast) & !getMeatChoppers().contains(blast) & result.contains(prevBlast)){
                     result.add(blast);
                 }
-                blast = null;
-                prevBlast = null;
             }
         }
-        Collection<Point> result2 = new LinkedList<Point>();
+        Collection<Point> result2 = new LinkedList<>();
         for (Point blast : result) {
             if (blast.isOutOf(size) || getWalls().contains(blast)) {
                 continue;
