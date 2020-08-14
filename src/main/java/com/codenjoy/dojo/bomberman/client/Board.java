@@ -106,7 +106,10 @@ public class Board extends AbstractBoard<Elements> {
     }
 
     public Collection<Point> getMeatChoppers() {
-        return get(MEAT_CHOPPER);
+        List<Point> result = new LinkedList<>();
+        result.addAll(get(MEAT_CHOPPER));
+        result.addAll(get(DEAD_MEAT_CHOPPER));
+        return result;
     }
 
     public Collection<Point> getWalls() {

@@ -23,20 +23,11 @@ package com.codenjoy.dojo.bomberman.client;
  */
 
 import com.codenjoy.dojo.bomberman.model.Elements;
-import com.codenjoy.dojo.client.AbstractLayeredBoard;
 import com.codenjoy.dojo.services.*;
 import com.codenjoy.dojo.client.Solver;
 import com.codenjoy.dojo.client.WebSocketRunner;
-import com.sun.javafx.scene.web.Debugger;
-import org.eclipse.jetty.util.log.Log;
-import org.eclipse.jetty.util.log.Logger;
-import org.eclipse.jetty.websocket.common.io.FrameFlusher;
-import sun.util.locale.provider.LocaleServiceProviderPool;
-
-import javax.swing.text.html.parser.Entity;
 import java.util.*;
 
-import static org.eclipse.jetty.http.MultiPartParser.LOG;
 
 /**
  * User: your name
@@ -46,6 +37,18 @@ public class YourSolver implements Solver<Board> {
     private Dice dice;
     private Board board;
     private ArrayList<Point> bestPointsGlob = new ArrayList<>();
+    private int bestCostGlob;
+    private int bombTimer;
+    private int availBombs = 1;
+    private int blastRadius = 3;
+    private int blastRadiusDanger = 3;
+    private int blastRadiusTimer;
+    private int countIncreaseTimer;
+    private int immuneTimer;
+    private int remoteCount;
+    private int remoteCountBoom;
+    private boolean isAct;
+
 
     public YourSolver(Dice dice) {
         this.dice = dice;
@@ -56,10 +59,58 @@ public class YourSolver implements Solver<Board> {
     public String get(Board board) {
 
         this.board = board;
-        if (board.isMyBombermanDead()) return "";
 
-        boolean isAct = false;
-        int blastRadius = 3;
+        if (bombTimer > 0) {
+            bombTimer--;
+            if (bombTimer == 0) {
+                availBombs++;
+            }
+        }
+
+        if (countIncreaseTimer > 0) {
+            countIncreaseTimer--;
+            if (countIncreaseTimer <= 0 & availBombs > 1){
+                if (bombTimer > 0) {
+                    availBombs = 0;
+                } else {
+                    availBombs = 1;
+                }
+            }
+        }
+        if (blastRadiusTimer > 0) {
+            blastRadiusTimer--;
+            if (blastRadiusTimer == 0) {
+                blastRadius = 3;
+            }
+        }
+        if (immuneTimer > 0) {
+            immuneTimer--;
+            if (immuneTimer <= 0) {
+                blastRadiusDanger = 3;
+            }
+        }
+
+        if (board.isMyBombermanDead()) {
+            bombTimer = 0;
+            availBombs = 1;
+            blastRadius = 3;
+            blastRadiusTimer = 0;
+            countIncreaseTimer = 0;
+            immuneTimer = 0;
+            remoteCount = 0;
+            remoteCountBoom = 0;
+            return "";
+        }
+
+        System.out.println("bombTimer:" + bombTimer);
+        System.out.println("availBombs:" + availBombs);
+        System.out.println("blastRadius:" + blastRadius);
+        System.out.println("blastRadiusDanger:" + blastRadiusDanger);
+        System.out.println("blastRadiusTimer:" + blastRadiusTimer);
+        System.out.println("countIncreaseTimer:" + countIncreaseTimer);
+        System.out.println("immuneTimer:" + immuneTimer);
+        System.out.println("remoteCount:" + remoteCount);
+        System.out.println("remoteCountBoom:" + remoteCountBoom);
 
         ArrayList<Point> theWay = new ArrayList<>();
 
@@ -128,23 +179,35 @@ public class YourSolver implements Solver<Board> {
         theWay.removeAll(meatChoppers);
         System.out.println("-choppers:" + theWay.toString());
 
+        //Arseniy: ставим, если пришли в лучшую точку
+        System.out.println("bestPointsGlob,bestCostGlob:" + bestPointsGlob.toString() + "," + bestCostGlob);
+        isAct = bestPointsGlob.contains(board.getBomberman()) & (availBombs > 0) & bestCostGlob > 0;
+        if (remoteCountBoom > remoteCount & !fBlasts5.contains(board.getBomberman())) {
+            isAct = true;
+        }
+
         //Arseniy: считаем будущие пути и затраты/бонусы от них
         HashMap<Point, Step> newWay = new HashMap<>();
-        ArrayList<Point> bomberman = new ArrayList<>();
+
+        Collection<Point> bomberman = new ArrayList<>();
         bomberman.add(board.getBomberman());
-        addNewStep(newWay, bomberman, board.getBomberman(), 0);
+        HashMap<Point, Collection<Point>> allStepPoints = new HashMap<>();
+        allStepPoints.put(board.getBomberman(), bomberman);
+
+        HashMap<Point, Collection<Point>> allNextStepPoints = new HashMap<>();
+
+        for(int depth = 0; depth <= 15; depth++){
+            allNextStepPoints = new HashMap<>();
+            for (Map.Entry<Point, Collection<Point>> entry : allStepPoints.entrySet()) {
+                allNextStepPoints.putAll(addNewStep(newWay, entry.getValue(), entry.getKey(), depth));
+            }
+            allStepPoints = new HashMap<>(allNextStepPoints);
+        }
+
         System.out.println("newWay:" + newWay.toString());
 
         int bestCost = -9999;
         Step step;
-
-        //Arseniy: ставим, если пришли в лучшую точку
-        System.out.println("bestPointsGlob:" + bestPointsGlob.toString());
-        if (bestPointsGlob.contains(board.getBomberman())) {
-            isAct = true;
-        } else {
-            isAct = false;
-        }
 
         //Arseniy: если ставим бомбу, то текущая ячейка это -30
         if (isAct) {
@@ -161,6 +224,7 @@ public class YourSolver implements Solver<Board> {
             }
         }
 
+        bestCostGlob = bestCost;
         System.out.println("bestCost:" + bestCost);
 
         ArrayList<Point> bestPoints = new ArrayList<>();
@@ -340,7 +404,7 @@ public class YourSolver implements Solver<Board> {
             }
 
             //Arseniy: добавим взрывы от бомбы, которую поставим
-            for (int i = 1; i < blastRadius; i++) {
+            for (int i = 1; i < blastRadiusDanger; i++) {
                 fBlasts.add(new PointImpl(board.getBomberman().getX() + i, board.getBomberman().getY()));
                 fBlasts.add(new PointImpl(board.getBomberman().getX() - i, board.getBomberman().getY()));
                 fBlasts.add(new PointImpl(board.getBomberman().getX(), board.getBomberman().getY() + i));
@@ -390,6 +454,23 @@ public class YourSolver implements Solver<Board> {
         System.out.println(finalWay.get(0).toString());
         System.out.println(finalWay.get(0).relative(board.getBomberman()).toString());
 
+        if (board.get(Elements.BOMB_COUNT_INCREASE).contains(finalWay.get(0))){
+            countIncreaseTimer = 30;
+            availBombs = 4;
+        }
+        if (board.get(Elements.BOMB_BLAST_RADIUS_INCREASE).contains(finalWay.get(0))) {
+            blastRadiusTimer = blastRadiusTimer + 30;
+            blastRadius = blastRadius + 2;
+        }
+        if (board.get(Elements.BOMB_REMOTE_CONTROL).contains(finalWay.get(0))) {
+            remoteCount = 3;
+            remoteCountBoom = 3;
+        }
+        if (board.get(Elements.BOMB_IMMUNE).contains(finalWay.get(0))) {
+            immuneTimer = 30;
+            blastRadiusDanger = 0;
+        }
+
         String move;
         switch (finalWay.get(0).relative(board.getBomberman()).toString()) {
             case "[1,0]":
@@ -409,6 +490,17 @@ public class YourSolver implements Solver<Board> {
         }
 
         if (isAct) {
+            if (remoteCountBoom == remoteCount) {
+                bombTimer = 5;
+                availBombs--;
+                if (remoteCount > 0) {
+                    remoteCount--;
+                }
+            } else {
+                availBombs++;
+                remoteCountBoom--;
+            }
+
             return "ACT" + move;
         } else
         {
@@ -416,14 +508,14 @@ public class YourSolver implements Solver<Board> {
         }
     }
 
-    private void addNewStep( HashMap<Point, Step> newWay,
+    private HashMap <Point, Collection<Point>> addNewStep( HashMap<Point, Step> newWay,
                                     Collection<Point> currentPoints,
                                     Point previousPoint,
                                     int depth) {
 
         int expectedCost = 0;
         ArrayList<Point> newPoints;
-        HashMap <Point, ArrayList<Point>> allNextSteps = new HashMap<>();
+        HashMap <Point, Collection<Point>> allNextSteps = new HashMap<>();
         Step newStep;
 
         depth++;
@@ -448,13 +540,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("currentPoint,newPoints:" + currentPoint + ";" + newPoints.toString());
             }
         }
-
-        if (depth < 5) {
-            for(Map.Entry<Point, ArrayList<Point>> entry : allNextSteps.entrySet()) {
-                addNewStep(newWay, entry.getValue(), entry.getKey(), depth);
-            }
-        }
-
+        return allNextSteps;
     }
 
     //Arseniy: сколько я могу получить, если приду в эту точку (и поставлю бомбу)
@@ -478,6 +564,9 @@ public class YourSolver implements Solver<Board> {
         Collection<Point> bomb5         = board.get(Elements.BOMB_TIMER_5);
         bomb5.addAll(board.get(Elements.BOMB_BOMBERMAN));
         bomb5.addAll(board.get(Elements.OTHER_BOMB_BOMBERMAN));
+        if (isAct) {
+            bomb5.add(board.getBomberman());
+        }
 
         Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1);
         Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2);
@@ -534,7 +623,7 @@ public class YourSolver implements Solver<Board> {
         PointImpl blast;
         PointImpl prevBlast;
 
-        for (int i = 1 ; i <=3 ; i++) {
+        for (int i = 1 ; i <= blastRadius ; i++) {
             blast = new PointImpl(currentPoint.getX() - i, currentPoint.getY());
             prevBlast = new PointImpl(currentPoint.getX() - i + 1, currentPoint.getY());
             if (blasts.contains(prevBlast)) {
@@ -588,7 +677,7 @@ public class YourSolver implements Solver<Board> {
         int cost = 0;
         //Arseniy: взрыв перка = всегда дурной чоппер = смерть
         if (perks.contains(point)) {
-            cost = cost - 300;
+            cost = cost - 3000;
             if (debug) {
                 System.out.println("expectedCost-perk-destr:" + point + ";" + cost);
             }
@@ -596,7 +685,7 @@ public class YourSolver implements Solver<Board> {
         //Arseniy: стены приносят очки, но чем они дальше, тем меньше дают
         for (Point dWall : dWalls) {
             if (point.itsMe(dWall)) {
-                if (depth <= 2) {
+                if (depth <= 10) {
                     cost = cost + 30 - depth;
                     if (debug) {
                         System.out.println("expectedCost-dwall:" + point + ";" + cost);
@@ -701,7 +790,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("-choppers-newdir:" + depth + ";" + newDirections.toString());
             }
         }
-        if (depth <= 2) {
+        if (depth <= 1) {
             newDirections.removeAll(fMeatChoppers);
             if (debug) {
                 System.out.println("-fChoppers-newdir:" + depth + ";" + newDirections.toString());
