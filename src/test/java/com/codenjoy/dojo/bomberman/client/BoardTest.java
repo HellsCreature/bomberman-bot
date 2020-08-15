@@ -179,7 +179,7 @@ public class BoardTest {
     public void shouldWork_getFutureBlasts() {
         assertEquals("[[1,6], [1,7], [2,5], [2,6], [2,7], [3,4], [3,5], [3,6], " +
                 "[4,3], [4,4], [4,5], [5,4], [6,3], [6,5], [6,7], [7,2], [7,3], " +
-                "[7,4], [7,5], [7,6], [7,7]]", board.getFutureBlasts().toString());
+                "[7,4], [7,5], [7,6], [7,7]]", board.getFutureBlasts(3).toString());
     }
 
     @Test

@@ -60,6 +60,7 @@ public class YourSolver implements Solver<Board> {
 
         this.board = board;
 
+        isAct = false;
         if (bombTimer > 0) {
             bombTimer--;
             if (bombTimer == 0) {
@@ -81,12 +82,13 @@ public class YourSolver implements Solver<Board> {
             blastRadiusTimer--;
             if (blastRadiusTimer == 0) {
                 blastRadius = 3;
+                blastRadiusDanger = 3;
             }
         }
         if (immuneTimer > 0) {
             immuneTimer--;
             if (immuneTimer <= 0) {
-                blastRadiusDanger = 3;
+                blastRadiusDanger = blastRadius;
             }
         }
 
@@ -94,11 +96,14 @@ public class YourSolver implements Solver<Board> {
             bombTimer = 0;
             availBombs = 1;
             blastRadius = 3;
+            blastRadiusDanger = 3;
             blastRadiusTimer = 0;
             countIncreaseTimer = 0;
             immuneTimer = 0;
             remoteCount = 0;
             remoteCountBoom = 0;
+            bestPointsGlob = new ArrayList<>();
+            bestCostGlob = 0;
             return "";
         }
 
@@ -112,20 +117,20 @@ public class YourSolver implements Solver<Board> {
         System.out.println("remoteCount:" + remoteCount);
         System.out.println("remoteCountBoom:" + remoteCountBoom);
 
-        ArrayList<Point> theWay = new ArrayList<>();
+        ArrayList<Point> theWayInit = new ArrayList<>();
 
         //Arseniy: Задаём направления
-        theWay.add(new PointImpl(board.getBomberman()));
-        theWay.add(new PointImpl(board.getBomberman()));
-        theWay.get(0).change(Direction.LEFT);
-        theWay.add(new PointImpl(board.getBomberman()));
-        theWay.get(1).change(Direction.UP);
-        theWay.add(new PointImpl(board.getBomberman()));
-        theWay.get(2).change(Direction.RIGHT);
-        theWay.add(new PointImpl(board.getBomberman()));
-        theWay.get(3).change(Direction.DOWN);
+        theWayInit.add(new PointImpl(board.getBomberman()));
+        theWayInit.add(new PointImpl(board.getBomberman()));
+        theWayInit.get(0).change(Direction.LEFT);
+        theWayInit.add(new PointImpl(board.getBomberman()));
+        theWayInit.get(1).change(Direction.UP);
+        theWayInit.add(new PointImpl(board.getBomberman()));
+        theWayInit.get(2).change(Direction.RIGHT);
+        theWayInit.add(new PointImpl(board.getBomberman()));
+        theWayInit.get(3).change(Direction.DOWN);
 
-        System.out.println("init:" + theWay.toString());
+        System.out.println("init:" + theWayInit.toString());
 
         //Arseniy: Что нам может мешать
         Collection<Point> walls         = board.getWalls();
@@ -135,7 +140,7 @@ public class YourSolver implements Solver<Board> {
         Collection<Point> oBombers      = board.getOtherBombermans();
 
         Collection<Point> bombs         = board.getBombs();
-        Collection<Point> fBlasts       = board.getFutureBlasts();
+        Collection<Point> fBlasts       = board.getFutureBlasts(blastRadiusDanger);
 
         Collection<Point> bomb1         = board.get(Elements.BOMB_TIMER_1);
         Collection<Point> bomb2         = board.get(Elements.BOMB_TIMER_2);
@@ -145,11 +150,11 @@ public class YourSolver implements Solver<Board> {
         bomb5.addAll(board.get(Elements.BOMB_BOMBERMAN));
         bomb5.addAll(board.get(Elements.OTHER_BOMB_BOMBERMAN));
 
-        Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1);
-        Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2);
-        Collection<Point> fBlasts3      = board.getFutureBlastsByCollection(bomb3);
-        Collection<Point> fBlasts4      = board.getFutureBlastsByCollection(bomb4);
-        Collection<Point> fBlasts5      = board.getFutureBlastsByCollection(bomb5);
+        Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1, blastRadiusDanger);
+        Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2, blastRadiusDanger);
+        Collection<Point> fBlasts3      = board.getFutureBlastsByCollection(bomb3, blastRadiusDanger);
+        Collection<Point> fBlasts4      = board.getFutureBlastsByCollection(bomb4, blastRadiusDanger);
+        Collection<Point> fBlasts5      = board.getFutureBlastsByCollection(bomb5, blastRadiusDanger);
 
         System.out.println("bomb1:" + bomb1.toString());
         System.out.println("bomb2:" + bomb2.toString());
@@ -167,6 +172,8 @@ public class YourSolver implements Solver<Board> {
             return "";
         }
 
+        ArrayList<Point> theWay = new ArrayList<>(theWayInit);
+
         //Arseniy: Убираем те направления, куда невозможно=>не нужно идти
         theWay.removeAll(walls);
         System.out.println("-walls:" + theWay.toString());
@@ -182,10 +189,9 @@ public class YourSolver implements Solver<Board> {
         //Arseniy: ставим, если пришли в лучшую точку
         System.out.println("bestPointsGlob,bestCostGlob:" + bestPointsGlob.toString() + "," + bestCostGlob);
         isAct = bestPointsGlob.contains(board.getBomberman()) & (availBombs > 0) & bestCostGlob > 0;
-        if (remoteCountBoom > remoteCount & !fBlasts5.contains(board.getBomberman())) {
-            isAct = true;
+        if (!isAct) {
+            isAct = theWayInit.containsAll(oBombers) & availBombs > 0;
         }
-
         //Arseniy: считаем будущие пути и затраты/бонусы от них
         HashMap<Point, Step> newWay = new HashMap<>();
 
@@ -196,7 +202,7 @@ public class YourSolver implements Solver<Board> {
 
         HashMap<Point, Collection<Point>> allNextStepPoints = new HashMap<>();
 
-        for(int depth = 0; depth <= 15; depth++){
+        for(int depth = 0; depth <= 13; depth++){
             allNextStepPoints = new HashMap<>();
             for (Map.Entry<Point, Collection<Point>> entry : allStepPoints.entrySet()) {
                 allNextStepPoints.putAll(addNewStep(newWay, entry.getValue(), entry.getKey(), depth));
@@ -404,7 +410,7 @@ public class YourSolver implements Solver<Board> {
             }
 
             //Arseniy: добавим взрывы от бомбы, которую поставим
-            for (int i = 1; i < blastRadiusDanger; i++) {
+            for (int i = 1; i < blastRadius; i++) {
                 fBlasts.add(new PointImpl(board.getBomberman().getX() + i, board.getBomberman().getY()));
                 fBlasts.add(new PointImpl(board.getBomberman().getX() - i, board.getBomberman().getY()));
                 fBlasts.add(new PointImpl(board.getBomberman().getX(), board.getBomberman().getY() + i));
@@ -451,6 +457,10 @@ public class YourSolver implements Solver<Board> {
             finalWay.add(board.getBomberman());
         }
 
+        if (remoteCountBoom > remoteCount & !fBlasts5.contains(finalWay.get(0))) {
+            isAct = true;
+        }
+
         System.out.println(finalWay.get(0).toString());
         System.out.println(finalWay.get(0).relative(board.getBomberman()).toString());
 
@@ -461,6 +471,7 @@ public class YourSolver implements Solver<Board> {
         if (board.get(Elements.BOMB_BLAST_RADIUS_INCREASE).contains(finalWay.get(0))) {
             blastRadiusTimer = blastRadiusTimer + 30;
             blastRadius = blastRadius + 2;
+            blastRadiusDanger = blastRadiusDanger + 2;
         }
         if (board.get(Elements.BOMB_REMOTE_CONTROL).contains(finalWay.get(0))) {
             remoteCount = 3;
@@ -568,16 +579,16 @@ public class YourSolver implements Solver<Board> {
             bomb5.add(board.getBomberman());
         }
 
-        Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1);
-        Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2);
-        Collection<Point> fBlasts3      = board.getFutureBlastsByCollection(bomb3);
-        Collection<Point> fBlasts4      = board.getFutureBlastsByCollection(bomb4);
-        Collection<Point> fBlasts5      = board.getFutureBlastsByCollection(bomb5);
+        Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1, blastRadiusDanger);
+        Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2, blastRadiusDanger);
+        Collection<Point> fBlasts3      = board.getFutureBlastsByCollection(bomb3, blastRadiusDanger);
+        Collection<Point> fBlasts4      = board.getFutureBlastsByCollection(bomb4, blastRadiusDanger);
+        Collection<Point> fBlasts5      = board.getFutureBlastsByCollection(bomb5, blastRadiusDanger);
 
         //Arseniy: перки дают очки, но далеко за ними идти не стоит
         for (Point perk : perks) {
-            if (currentPoint.itsMe(perk) & depth <= 10) {
-                expectedCost = expectedCost + 100 - depth * 10;
+            if (currentPoint.itsMe(perk) & depth <= 15) {
+                expectedCost = expectedCost + 150 - depth * 10;
                 if (debug) {
                     System.out.println("expectedCost-perk:" + currentPoint + ";" + expectedCost);
                 }
@@ -706,11 +717,11 @@ public class YourSolver implements Solver<Board> {
             }
         }
         //todo: не считать одного игрока в разных точка взрыва
-        //Arseniy: игрок - тоже самое, что и чопперы, только очков побольше и скорее стоят, чем двигаются
+        //Arseniy: игрок - тоже самое, что и чопперы, только очков побольше
         for (Point oBomber: oBombers) {
             if (Math.abs(point.getX() - oBomber.getX()) + Math.abs(point.getY() - oBomber.getY()) <= 0) {
-                if (depth <= 10) {
-                    cost = cost + 100 - depth * 10;
+                if (depth <= 100) {
+                    cost = cost + 150 - depth * 10;
                     if (debug) {
                         System.out.println("expectedCost-player:" + point + ";" + cost);
                     }
@@ -739,9 +750,6 @@ public class YourSolver implements Solver<Board> {
         Collection<Point> dWalls        = board.getDestroyableWalls();
         Collection<Point> oBombers      = board.getOtherBombermans();
 
-        Collection<Point> bombs         = board.getBombs();
-        Collection<Point> fBlasts       = board.getFutureBlasts();
-
         Collection<Point> bomb1         = board.get(Elements.BOMB_TIMER_1);
         Collection<Point> bomb2         = board.get(Elements.BOMB_TIMER_2);
         Collection<Point> bomb3         = board.get(Elements.BOMB_TIMER_3);
@@ -750,11 +758,11 @@ public class YourSolver implements Solver<Board> {
         bomb5.addAll(board.get(Elements.BOMB_BOMBERMAN));
         bomb5.addAll(board.get(Elements.OTHER_BOMB_BOMBERMAN));
 
-        Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1);
-        Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2);
-        Collection<Point> fBlasts3      = board.getFutureBlastsByCollection(bomb3);
-        Collection<Point> fBlasts4      = board.getFutureBlastsByCollection(bomb4);
-        Collection<Point> fBlasts5      = board.getFutureBlastsByCollection(bomb5);
+        Collection<Point> fBlasts1      = board.getFutureBlastsByCollection(bomb1, blastRadiusDanger);
+        Collection<Point> fBlasts2      = board.getFutureBlastsByCollection(bomb2, blastRadiusDanger);
+        Collection<Point> fBlasts3      = board.getFutureBlastsByCollection(bomb3, blastRadiusDanger);
+        Collection<Point> fBlasts4      = board.getFutureBlastsByCollection(bomb4, blastRadiusDanger);
+        Collection<Point> fBlasts5      = board.getFutureBlastsByCollection(bomb5, blastRadiusDanger);
 
         if (debug) {
             System.out.println("bomb1-newdir:" + depth + ";" + bomb1.toString());
@@ -790,7 +798,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("-choppers-newdir:" + depth + ";" + newDirections.toString());
             }
         }
-        if (depth <= 1) {
+        if (depth <= 1 & newDirections.containsAll(fBlasts1)) {
             newDirections.removeAll(fMeatChoppers);
             if (debug) {
                 System.out.println("-fChoppers-newdir:" + depth + ";" + newDirections.toString());
@@ -861,7 +869,7 @@ public class YourSolver implements Solver<Board> {
         WebSocketRunner.runClient(
                 // paste here board page url from browser after registration
                 /*"http://codenjoy.com:80/codenjoy-contest/board/player/3edq63tw0bq4w4iem7nb?code=1234567890123456789"*/
-                "http://codingdojo.kz/codenjoy-contest/board/player/y28zy3gzg5wygjwd74qp?code=8030501113052592774",
+                "http://codingdojo.kz/codenjoy-contest/board/player/tkj3gswcyl3suadwkmdm?code=1255020736539250228",
                 new YourSolver(new RandomDice()),
                 new Board());
     }

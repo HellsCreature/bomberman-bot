@@ -90,7 +90,7 @@ public class Board extends AbstractBoard<Elements> {
                 getDestroyableWalls(),
                 getBombs(),
                 getBlasts(),
-                getFutureBlasts());
+                getFutureBlasts(3));
     }
 
     public Point getBomberman() {
@@ -145,7 +145,7 @@ public class Board extends AbstractBoard<Elements> {
         return get(BOOM);
     }
 
-    public Collection<Point> getFutureBlasts() {
+    public Collection<Point> getFutureBlasts(int blastRadius) {
         Collection<Point> bombs = getBombs();
         Collection<Point> result = new LinkedList<>();
         for (Point bomb : bombs) {
@@ -154,7 +154,7 @@ public class Board extends AbstractBoard<Elements> {
             PointImpl prevBlast;
             //Arseniy: взрыв нам нужен только там, где может пройти бомбер,
             //а это значит никаких стен и чоперов
-            for (int i = 1; i <= 3; i++)
+            for (int i = 1; i <= blastRadius; i++)
             {
                 blast = new PointImpl(bomb.getX() - i, bomb.getY());
                 prevBlast = new PointImpl(bomb.getX() - i + 1, bomb.getY());
@@ -189,7 +189,8 @@ public class Board extends AbstractBoard<Elements> {
     }
 
     //Arseniy: взрывы для конкретного списка бомб
-    public Collection<Point> getFutureBlastsByCollection(Collection<Point> bombs) {
+    public Collection<Point> getFutureBlastsByCollection(Collection<Point> bombs,
+                                                         int blastRadius) {
         Collection<Point> result = new LinkedList<>();
         for (Point bomb : bombs) {
             result.add(bomb);
@@ -197,7 +198,7 @@ public class Board extends AbstractBoard<Elements> {
             PointImpl prevBlast;
             //Arseniy: взрыв нам нужен только там, где может пройти бомбер,
             //а это значит никаких стен и чоперов
-            for (int i = 1; i <= 3; i++)
+            for (int i = 1; i <= blastRadius; i++)
             {
                 blast = new PointImpl(bomb.getX() - i, bomb.getY());
                 prevBlast = new PointImpl(bomb.getX() - i + 1, bomb.getY());
