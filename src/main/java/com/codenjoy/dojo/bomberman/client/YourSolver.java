@@ -202,7 +202,7 @@ public class YourSolver implements Solver<Board> {
 
         HashMap<Point, Collection<Point>> allNextStepPoints = new HashMap<>();
 
-        for(int depth = 0; depth <= 13; depth++){
+        for(int depth = 0; depth <= 10; depth++){
             allNextStepPoints = new HashMap<>();
             for (Map.Entry<Point, Collection<Point>> entry : allStepPoints.entrySet()) {
                 allNextStepPoints.putAll(addNewStep(newWay, entry.getValue(), entry.getKey(), depth));
